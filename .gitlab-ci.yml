@@ -1,0 +1,101 @@
+# Tests run on every push and merge request. Wheels and the sdist are built on
+# the default branch, on tags, and in pipelines started by hand (Build >
+# Pipelines > Run pipeline).
+
+stages: [test, build]
+
+# One pipeline per change: merge request pipelines when there is an MR,
+# branch pipelines otherwise.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.uv-cache"
+  UV_LINK_MODE: copy
+
+.release:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+test:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  parallel:
+    matrix:
+      # Oldest supported, newest with a regular wheel, and abi3
+      - PYTHON_VERSION: ["3.10", "3.11", "3.13"]
+  variables:
+    UV_PYTHON: "python${PYTHON_VERSION}"  # the image's interpreter
+    UV_PYTHON_DOWNLOADS: never
+  cache:
+    key: "uv-${PYTHON_VERSION}"
+    paths: [.uv-cache]
+  before_script:
+    - pip install --quiet uv
+  script:
+    - uv sync --locked
+    - uv run pytest --junitxml=report.xml
+  after_script:
+    - uv cache prune --ci
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
+# cibuildwheel builds Linux wheels in manylinux/musllinux containers, so it
+# needs a Docker daemon (Docker-in-Docker; the runner must allow privileged
+# services, as GitLab.com's hosted runners do).
+.cibuildwheel:
+  stage: build
+  image: python:3.12
+  services:
+    - name: docker:dind
+      entrypoint: ["env", "-u", "DOCKER_HOST"]
+      command: ["dockerd-entrypoint.sh"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - curl -sSL https://get.docker.com/ | sh
+    - pip install --quiet cibuildwheel==3.1.4
+  script:
+    - cibuildwheel --platform linux --output-dir wheelhouse
+  artifacts:
+    paths: [wheelhouse/]
+
+wheels:linux-x86_64:
+  extends: [.cibuildwheel, .release]
+
+# aarch64 wheels are built under QEMU emulation, which takes much longer, so
+# this job only runs when started by hand.
+wheels:linux-aarch64:
+  extends: .cibuildwheel
+  variables:
+    CIBW_ARCHS_LINUX: aarch64
+  script:
+    - docker run --rm --privileged tonistiigi/binfmt --install arm64
+    - cibuildwheel --platform linux --output-dir wheelhouse
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG || $CI_PIPELINE_SOURCE == "web"
+      when: manual
+      allow_failure: true
+
+sdist:
+  stage: build
+  extends: .release
+  image: python:3.12
+  before_script:
+    - pip install --quiet uv
+  script:
+    - uv build --sdist
+  artifacts:
+    paths: [dist/]

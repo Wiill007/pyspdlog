@@ -1,6 +1,10 @@
 # pyspdlog
 
 nanobind bindings for spdlog 1.17 (fetched by CMake), packaged with scikit-build-core.
+Supported platforms: Linux (macOS untested). Windows is deliberately unsupported.
+CI/CD is GitLab (`.gitlab-ci.yml`), not GitHub Actions; the `origin` remote is a GitHub URL.
+User documentation lives in `docs/` (numbered files, index in `docs/README.md`); keep it in sync
+with API changes.
 
 ## Commands
 

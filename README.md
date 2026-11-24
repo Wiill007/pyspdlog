@@ -1,7 +1,5 @@
 # PySpdlog
 
-[![CI](https://github.com/Wiill007/spdlog-python-bindings/actions/workflows/ci.yml/badge.svg)](https://github.com/Wiill007/spdlog-python-bindings/actions/workflows/ci.yml)
-
 Python bindings for the [spdlog](https://github.com/gabime/spdlog) C++ logging
 library, built with [nanobind](https://github.com/wjakob/nanobind).
 
@@ -26,8 +24,12 @@ log.debug("only formatted if DEBUG is enabled: {}", expensive_value)
   are stopped cleanly at exit and handled across `os.fork()`.
 - **Typed.** Ships a `.pyi` stub and `py.typed`.
 
-Requires Python 3.10+. Python 3.12+ uses a single abi3 wheel. spdlog 1.17 is compiled
-into the extension, so there is nothing else to install.
+Requires Python 3.10+ on Linux (macOS is expected to work but untested; Windows is not
+supported). Python 3.12+ uses a
+single abi3 wheel. spdlog 1.17 is compiled into the extension, so there is nothing else
+to install.
+
+**Documentation:** see [`docs/`](docs/README.md) for the full guide and API reference.
 
 ## Installation
 
@@ -290,8 +292,10 @@ Set `PYSPDLOG_LEAK_WARNINGS=1` to make nanobind report objects still alive at ex
 The exit-time tests enable it.
 
 Wheels are built with [cibuildwheel](https://cibuildwheel.pypa.io/) (configured in
-`pyproject.toml`). CI builds them for Linux (x86_64 and aarch64, glibc and musl),
-macOS (arm64) and Windows on every push to `main`.
+`pyproject.toml`). The GitLab CI/CD pipeline (`.gitlab-ci.yml`) runs the tests on every
+push and merge request, and builds Linux wheels (x86_64, plus aarch64 on demand; glibc and
+musl) and the sdist on the default branch and on tags. See
+[docs/18-development.md](docs/18-development.md) for more.
 
 ## License
 
